@@ -7,7 +7,7 @@ func CheckUserPassword(email, password string) bool {
 	q.Set("email", email)
 	q.Set("password", password)
 	// @TODO add error logging
-	isValid, _ := requestBool(, q)
+	isValid, _ := requestBool(envCallbackUrlPasswordCheck, q)
 
 	return isValid
 }
