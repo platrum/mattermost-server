@@ -13,7 +13,7 @@ import (
 )
 
 func CheckUserPassword(user *model.User, password string) error {
-	if strings.Contains(user.Roles, "system_admin") || user.IsBot {
+	if strings.Contains(user.Roles, model.SystemAdminRoleId) || user.IsBot {
 		if err := ComparePassword(user.Password, password); err != nil {
 			return NewErrInvalidPassword("")
 		}
