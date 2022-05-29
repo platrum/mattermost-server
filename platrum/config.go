@@ -3,20 +3,20 @@ package platrum
 import "os"
 
 const (
-	envCoreHost = "MESSENGER_CORE_HOST"
-	envCorePort = "MESSENGER_CORE_PORT"
+	envApiHost                  = "MESSENGER_API_HOST"
+	envCallbackUrlPasswordCheck = "MESSENGER_CALLBACK_URL_PASSWORD_CHECK"
 )
 
-func coreHost() string {
-	if res, ok := os.LookupEnv(envCoreHost); ok {
+func apiHost() string {
+	if res, ok := os.LookupEnv(envApiHost); ok {
 		return res
 	}
 
 	return ""
 }
 
-func corePort() string {
-	if res, ok := os.LookupEnv(envCorePort); ok {
+func callbackUrlPasswordCheck() string {
+	if res, ok := os.LookupEnv(envCallbackUrlPasswordCheck); ok {
 		return res
 	}
 

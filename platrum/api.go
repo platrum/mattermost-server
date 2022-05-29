@@ -8,11 +8,11 @@ import (
 	"net/url"
 )
 
-func buildUrl(method, query string) string {
+func buildUrl(path, query string) string {
 	u := url.URL{
 		Scheme:   "http",
-		Host:     fmt.Sprintf("%s:%s", coreHost(), corePort()),
-		Path:     "/core-api/" + method,
+		Host:     apiHost(),
+		Path:     path,
 		RawQuery: query,
 	}
 
@@ -33,13 +33,13 @@ func requestBool(method string, query url.Values) (bool, error) {
 	return res, nil
 }
 
-func sendPostRequest(method, query string, body interface{}) ([]byte, error) {
+func sendPostRequest(path, query string, body interface{}) ([]byte, error) {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 
-	u := buildUrl(method, query)
+	u := buildUrl(path, query)
 
 	resp, err := http.Post(u, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
