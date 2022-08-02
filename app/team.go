@@ -30,6 +30,18 @@ import (
 	"github.com/mattermost/mattermost-server/v6/store/sqlstore"
 )
 
+type teamServiceWrapper struct {
+	app AppIface
+}
+
+func (w *teamServiceWrapper) GetMember(teamID, userID string) (*model.TeamMember, error) {
+	return w.app.GetTeamMember(teamID, userID)
+}
+
+func (w *teamServiceWrapper) CreateMember(ctx *request.Context, teamID, userID string) (*model.TeamMember, error) {
+	return w.app.AddTeamMember(ctx, teamID, userID)
+}
+
 func (a *App) AdjustTeamsFromProductLimits(teamLimits *model.TeamsLimits) *model.AppError {
 	maxActiveTeams := *teamLimits.Active
 	teams, appErr := a.GetAllTeams()
@@ -773,21 +785,6 @@ func (a *App) JoinUserToTeam(c *request.Context, team *model.Team, user *model.U
 		return teamMember, nil
 	}
 
-	if pluginsEnvironment := a.GetPluginsEnvironment(); pluginsEnvironment != nil {
-		var actor *model.User
-		if userRequestorId != "" {
-			actor, _ = a.GetUser(userRequestorId)
-		}
-
-		a.Srv().Go(func() {
-			pluginContext := pluginContext(c)
-			pluginsEnvironment.RunMultiPluginHook(func(hooks plugin.Hooks) bool {
-				hooks.UserHasJoinedTeam(pluginContext, teamMember, actor)
-				return true
-			}, plugin.UserHasJoinedTeamID)
-		})
-	}
-
 	if _, err := a.Srv().Store.User().UpdateUpdateAt(user.Id); err != nil {
 		return nil, model.NewAppError("JoinUserToTeam", "app.user.update_update.app_error", nil, err.Error(), http.StatusInternalServerError)
 	}
@@ -818,6 +815,21 @@ func (a *App) JoinUserToTeam(c *request.Context, team *model.Team, user *model.U
 	a.ClearSessionCacheForUser(user.Id)
 	a.InvalidateCacheForUser(user.Id)
 	a.invalidateCacheForUserTeams(user.Id)
+
+	if pluginsEnvironment := a.GetPluginsEnvironment(); pluginsEnvironment != nil {
+		var actor *model.User
+		if userRequestorId != "" {
+			actor, _ = a.GetUser(userRequestorId)
+		}
+
+		a.Srv().Go(func() {
+			pluginContext := pluginContext(c)
+			pluginsEnvironment.RunMultiPluginHook(func(hooks plugin.Hooks) bool {
+				hooks.UserHasJoinedTeam(pluginContext, teamMember, actor)
+				return true
+			}, plugin.UserHasJoinedTeamID)
+		})
+	}
 
 	message := model.NewWebSocketEvent(model.WebsocketEventAddedToTeam, "", "", user.Id, nil)
 	message.Add("team_id", team.Id)

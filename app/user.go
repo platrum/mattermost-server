@@ -17,6 +17,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/mattermost/mattermost-server/v6/app/email"
 	"github.com/mattermost/mattermost-server/v6/app/imaging"
 	"github.com/mattermost/mattermost-server/v6/app/request"
@@ -28,7 +30,6 @@ import (
 	"github.com/mattermost/mattermost-server/v6/shared/mfa"
 	"github.com/mattermost/mattermost-server/v6/shared/mlog"
 	"github.com/mattermost/mattermost-server/v6/store"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -273,7 +274,17 @@ func (a *App) createUserOrGuest(c *request.Context, user *model.User, guest bool
 
 	recommendedNextStepsPref := model.Preference{UserId: ruser.Id, Category: model.PreferenceRecommendedNextSteps, Name: "hide", Value: "false"}
 	tutorialStepPref := model.Preference{UserId: ruser.Id, Category: model.PreferenceCategoryTutorialSteps, Name: ruser.Id, Value: "0"}
-	if err := a.Srv().Store.Preference().Save(model.Preferences{recommendedNextStepsPref, tutorialStepPref}); err != nil {
+
+	preferences := model.Preferences{recommendedNextStepsPref, tutorialStepPref}
+
+	if a.Config().FeatureFlags.InsightsEnabled {
+		// We don't want to show the insights intro modal for new users
+		preferences = append(preferences, model.Preference{UserId: ruser.Id, Category: model.PreferenceCategoryInsights, Name: model.PreferenceNameInsights, Value: "{\"insights_modal_viewed\":true}"})
+	} else {
+		preferences = append(preferences, model.Preference{UserId: ruser.Id, Category: model.PreferenceCategoryInsights, Name: model.PreferenceNameInsights, Value: "{\"insights_modal_viewed\":false}"})
+	}
+
+	if err := a.Srv().Store.Preference().Save(preferences); err != nil {
 		mlog.Warn("Encountered error saving user preferences", mlog.Err(err))
 	}
 
@@ -519,6 +530,15 @@ func (a *App) GetUsersInChannelByStatus(options *model.UserGetOptions) ([]*model
 	return users, nil
 }
 
+func (a *App) GetUsersInChannelByAdmin(options *model.UserGetOptions) ([]*model.User, *model.AppError) {
+	users, err := a.Srv().Store.User().GetProfilesInChannelByAdmin(options)
+	if err != nil {
+		return nil, model.NewAppError("GetUsersInChannelByAdmin", "app.user.get_profiles.app_error", nil, err.Error(), http.StatusInternalServerError)
+	}
+
+	return users, nil
+}
+
 func (a *App) GetUsersInChannelMap(options *model.UserGetOptions, asAdmin bool) (map[string]*model.User, *model.AppError) {
 	users, err := a.GetUsersInChannel(options)
 	if err != nil {
@@ -545,6 +565,14 @@ func (a *App) GetUsersInChannelPage(options *model.UserGetOptions, asAdmin bool)
 
 func (a *App) GetUsersInChannelPageByStatus(options *model.UserGetOptions, asAdmin bool) ([]*model.User, *model.AppError) {
 	users, err := a.GetUsersInChannelByStatus(options)
+	if err != nil {
+		return nil, err
+	}
+	return a.sanitizeProfiles(users, asAdmin), nil
+}
+
+func (a *App) GetUsersInChannelPageByAdmin(options *model.UserGetOptions, asAdmin bool) ([]*model.User, *model.AppError) {
+	users, err := a.GetUsersInChannelByAdmin(options)
 	if err != nil {
 		return nil, err
 	}
@@ -1647,10 +1675,14 @@ func (a *App) SendEmailVerification(user *model.User, newEmail, redirect string)
 	}
 
 	if _, err := a.GetStatus(user.Id); err != nil {
+		if err.StatusCode != http.StatusNotFound {
+			return err
+		}
 		eErr := a.Srv().EmailService.SendVerifyEmail(newEmail, user.Locale, a.GetSiteURL(), token.Token, redirect)
 		if eErr != nil {
 			return model.NewAppError("SendVerifyEmail", "api.user.send_verify_email_and_forget.failed.error", nil, eErr.Error(), http.StatusInternalServerError)
 		}
+
 		return nil
 	}
 
@@ -2299,7 +2331,7 @@ func (a *App) ConvertBotToUser(bot *model.Bot, userPatch *model.UserPatch, sysad
 
 	appErr := a.Srv().Store.Bot().PermanentDelete(bot.UserId)
 	if appErr != nil {
-		return nil, model.NewAppError("ConvertBotToUser", "app.user.convert_bot_to_user.app_error", nil, err.Error(), http.StatusInternalServerError)
+		return nil, model.NewAppError("ConvertBotToUser", "app.user.convert_bot_to_user.app_error", nil, appErr.Error(), http.StatusInternalServerError)
 	}
 
 	return user, nil
@@ -2449,7 +2481,7 @@ func (a *App) UpdateThreadFollowForUserFromChannelAdd(userID, teamID, threadID s
 		return model.NewAppError("UpdateThreadFollowForUserFromChannelAdd", "app.user.update_thread_follow_for_user.app_error", nil, err.Error(), http.StatusInternalServerError)
 	}
 
-	post, appErr := a.GetSinglePost(threadID)
+	post, appErr := a.GetSinglePost(threadID, false)
 	if appErr != nil {
 		return appErr
 	}
@@ -2489,13 +2521,15 @@ func (a *App) UpdateThreadFollowForUserFromChannelAdd(userID, teamID, threadID s
 		mlog.Warn("Failed to encode thread to JSON")
 	}
 	message.Add("thread", string(payload))
+	message.Add("previous_unread_replies", int64(0))
+	message.Add("previous_unread_mentions", int64(0))
 
 	a.Publish(message)
 	return nil
 }
 
 func (a *App) UpdateThreadReadForUserByPost(currentSessionId, userID, teamID, threadID, postID string) (*model.ThreadResponse, *model.AppError) {
-	post, err := a.GetSinglePost(postID)
+	post, err := a.GetSinglePost(postID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -2528,7 +2562,7 @@ func (a *App) UpdateThreadReadForUser(currentSessionId, userID, teamID, threadID
 		return nil, model.NewAppError("UpdateThreadReadForUser", "app.user.update_thread_read_for_user.app_error", nil, nErr.Error(), http.StatusInternalServerError)
 	}
 
-	post, err := a.GetSinglePost(threadID)
+	post, err := a.GetSinglePost(threadID, false)
 	if err != nil {
 		return nil, err
 	}
