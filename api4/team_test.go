@@ -967,6 +967,7 @@ func TestPermanentDeleteTeam(t *testing.T) {
 
 func TestGetAllTeams(t *testing.T) {
 	th := Setup(t).InitBasic()
+	th.LoginSystemManager()
 	defer th.TearDown()
 	client := th.Client
 
@@ -1403,6 +1404,7 @@ func TestGetTeamByNameSanitization(t *testing.T) {
 
 func TestSearchAllTeams(t *testing.T) {
 	th := Setup(t).InitBasic()
+	th.LoginSystemManager()
 	defer th.TearDown()
 
 	oTeam := th.BasicTeam
@@ -3120,7 +3122,7 @@ func TestInviteUsersToTeam(t *testing.T) {
 	require.NoError(t, err)
 	nameFormat := *th.App.Config().TeamSettings.TeammateNameDisplay
 	expectedSubject := i18n.T("api.templates.invite_subject",
-		map[string]interface{}{"SenderName": th.SystemAdminUser.GetDisplayName(nameFormat),
+		map[string]any{"SenderName": th.SystemAdminUser.GetDisplayName(nameFormat),
 			"TeamDisplayName": th.BasicTeam.DisplayName,
 			"SiteName":        th.App.ClientConfig()["SiteName"]})
 	checkEmail(t, expectedSubject)
@@ -3131,7 +3133,7 @@ func TestInviteUsersToTeam(t *testing.T) {
 	_, _, err = th.SystemAdminClient.InviteUsersToTeamAndChannelsGracefully(th.BasicTeam.Id, []string{user1, user2}, []string{th.BasicChannel.Id}, "")
 	require.NoError(t, err)
 	expectedSubject = i18n.T("api.templates.invite_team_and_channel_subject",
-		map[string]interface{}{"SenderName": th.SystemAdminUser.GetDisplayName(nameFormat),
+		map[string]any{"SenderName": th.SystemAdminUser.GetDisplayName(nameFormat),
 			"TeamDisplayName": th.BasicTeam.DisplayName,
 			"ChannelName":     th.BasicChannel.DisplayName,
 			"SiteName":        th.App.ClientConfig()["SiteName"]})
@@ -3142,7 +3144,7 @@ func TestInviteUsersToTeam(t *testing.T) {
 	_, err = th.LocalClient.InviteUsersToTeam(th.BasicTeam.Id, emailList)
 	require.NoError(t, err)
 	expectedSubject = i18n.T("api.templates.invite_subject",
-		map[string]interface{}{"SenderName": "Administrator",
+		map[string]any{"SenderName": "Administrator",
 			"TeamDisplayName": th.BasicTeam.DisplayName,
 			"SiteName":        th.App.ClientConfig()["SiteName"]})
 	checkEmail(t, expectedSubject)
@@ -3153,7 +3155,7 @@ func TestInviteUsersToTeam(t *testing.T) {
 	_, _, err = th.LocalClient.InviteUsersToTeamAndChannelsGracefully(th.BasicTeam.Id, []string{user1, user2}, []string{th.BasicChannel.Id}, "")
 	require.NoError(t, err)
 	expectedSubject = i18n.T("api.templates.invite_team_and_channel_subject",
-		map[string]interface{}{"SenderName": "Administrator",
+		map[string]any{"SenderName": "Administrator",
 			"TeamDisplayName": th.BasicTeam.DisplayName,
 			"ChannelName":     th.BasicChannel.DisplayName,
 			"SiteName":        th.App.ClientConfig()["SiteName"]})
@@ -3277,7 +3279,7 @@ func TestInviteGuestsToTeam(t *testing.T) {
 
 	nameFormat := *th.App.Config().TeamSettings.TeammateNameDisplay
 	expectedSubject := i18n.T("api.templates.invite_guest_subject",
-		map[string]interface{}{"SenderName": th.SystemAdminUser.GetDisplayName(nameFormat),
+		map[string]any{"SenderName": th.SystemAdminUser.GetDisplayName(nameFormat),
 			"TeamDisplayName": th.BasicTeam.DisplayName,
 			"SiteName":        th.App.ClientConfig()["SiteName"]})
 
