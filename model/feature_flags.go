@@ -93,11 +93,11 @@ func (f *FeatureFlags) SetDefaults() {
 	f.EnableInactivityCheckJob = true
 	f.UseCaseOnboarding = true
 	f.GraphQL = false
-	f.InsightsEnabled = true
+	f.InsightsEnabled = false
 	f.CommandPalette = false
 	f.CallsEnabled = true
 	f.BoardsProduct = false
-	f.SendWelcomePost = true
+	f.SendWelcomePost = false
 	f.PostPriority = false
 	f.PeopleProduct = false
 	f.WorkTemplate = false
