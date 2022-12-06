@@ -182,7 +182,7 @@ func TestHookMessageWillBePosted(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.Equal(t, "message", post.Message)
-		retrievedPost, errSingle := th.App.Srv().Store.Post().GetSingle(post.Id, false)
+		retrievedPost, errSingle := th.App.Srv().Store().Post().GetSingle(post.Id, false)
 		require.NoError(t, errSingle)
 		assert.Equal(t, "message", retrievedPost.Message)
 	})
@@ -226,7 +226,7 @@ func TestHookMessageWillBePosted(t *testing.T) {
 		require.Nil(t, err)
 
 		assert.Equal(t, "message_fromplugin", post.Message)
-		retrievedPost, errSingle := th.App.Srv().Store.Post().GetSingle(post.Id, false)
+		retrievedPost, errSingle := th.App.Srv().Store().Post().GetSingle(post.Id, false)
 		require.NoError(t, errSingle)
 		assert.Equal(t, "message_fromplugin", retrievedPost.Message)
 	})
@@ -1234,7 +1234,7 @@ func TestHookRunDataRetention(t *testing.T) {
 	require.True(t, th.App.GetPluginsEnvironment().IsActive(pluginID))
 
 	hookCalled := false
-	th.App.GetPluginsEnvironment().RunMultiPluginHook(func(hooks plugin.Hooks) bool {
+	th.App.Channels().RunMultiHook(func(hooks plugin.Hooks) bool {
 		n, _ := hooks.RunDataRetention(0, 0)
 		// Ensure return it correct
 		assert.Equal(t, int64(100), n)
@@ -1278,7 +1278,7 @@ func TestHookOnSendDailyTelemetry(t *testing.T) {
 	require.True(t, th.App.GetPluginsEnvironment().IsActive(pluginID))
 
 	hookCalled := false
-	th.App.GetPluginsEnvironment().RunMultiPluginHook(func(hooks plugin.Hooks) bool {
+	th.App.Channels().RunMultiHook(func(hooks plugin.Hooks) bool {
 		hooks.OnSendDailyTelemetry()
 
 		hookCalled = true
@@ -1322,7 +1322,7 @@ func TestHookOnCloudLimitsUpdated(t *testing.T) {
 	require.True(t, th.App.GetPluginsEnvironment().IsActive(pluginID))
 
 	hookCalled := false
-	th.App.GetPluginsEnvironment().RunMultiPluginHook(func(hooks plugin.Hooks) bool {
+	th.App.Channels().RunMultiHook(func(hooks plugin.Hooks) bool {
 		hooks.OnCloudLimitsUpdated(nil)
 
 		hookCalled = true
